@@ -1,0 +1,53 @@
+#!/usr/bin/python3
+import numpy as np
+import pandas as pd
+from matplotlib import pyplot as plt
+import math
+def loadData(path):
+    colNames = ["ID","a", "b", "c", "d", "e", "f", "g", "h", "i", "CLASS",]
+    dataSet = pd.read_csv(path, names=colNames)
+    print(dataSet)
+    return dataSet
+
+def splitData(dataSet, testFrac):
+    testData = dataSet.sample(frac=testFrac)
+    trainData = dataSet.drop(testData.index)
+
+    print("train:\t","B:\t",len(trainData[trainData.CLASS == 0]),"\texp:\t",len(trainData[trainData.CLASS == 1]),)
+    print("test:\t","B:\t",len(testData[testData.CLASS == 0]),"\texp:\t",len(testData[testData.CLASS == 1]),)
+    return trainData, testData
+
+def getProb(avg, std, x):
+    return pd.DataFrame(
+        1 / (std * np.sqrt(2 * np.pi)) * np.exp(-0.5 * np.power((x - avg) / std, 2))).apply(np.prod,axis=1,)
+
+def pred(B, good):
+    df = pd.DataFrame(0, index=B.index, columns=["YHAT"], dtype=float)
+    df[np.maximum(B, good) == good] = 1
+    return df
+
+def mle(trainData, testData):
+
+    features = ["ID","a", "b", "c", "d", "e", "f", "g", "h", "i", "CLASS",]
+    trainY = trainData.CLASS
+    trainX = trainData[features]
+    testY = testData.CLASS
+    testX = testData[features]
+
+    B = getProb(trainX[trainY == 0].mean(), trainX[trainY == 0].std(), testX,)
+
+    good = getProb(trainX[trainY == 1].mean(), trainX[trainY == 1].std(), testX,)
+
+    predictions = pred(B, good)
+    print(predictions)
+    accuracy = len(predictions[predictions.YHAT == testY]) / len(testY)
+    cm = pd.DataFrame(0, index=["Actual No", "Actual Yes"], columns=["Predicted No", "Predicted Yes"], dtype=float,)
+
+    cm = len(predictions.loc[(predictions.YHAT == testY) & (predictions.YHAT == 1)])
+    return accuracy, cm
+
+if __name__ == "__main__":
+    dataSet = loadData("breast-cancer-wisconsin.data")
+    trainData, testData = splitData(dataSet, testFrac=0.2)
+    accuracy, cm = mle(trainData, testData)
+    print("Accuracy:\t", accuracy, "\nCM:\n", cm)
